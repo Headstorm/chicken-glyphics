@@ -8,12 +8,14 @@ from nltk.corpus import stopwords
 from keras.preprocessing.text import Tokenizer
 import pickle
 from tqdm import tqdm
+from nltk.stem import WordNetLemmatizer
 
 nltk.download('stopwords')
 nltk.download('averaged_perceptron_tagger')
 nltk.download('punkt')
 nltk.download('maxent_ne_chunker')
 nltk.download('words')
+nltk.download('wordnet')
 
 stop = stopwords.words('english')
 
@@ -220,6 +222,24 @@ def strip_token_to_length(tokens_list, length):
 
 def strip_token_to_length_df(tokens_df, length):
 	return tokens_df.loc[:,:length].fillna(0)
+
+def stemming_text(tokens_list):
+	from nltk.stem.snowball import SnowballStemmer
+	stemmer = SnowballStemmer("english")
+	result = []
+	for token in tokens_list:
+		temp = stemmer.stem(token)
+		result.append(temp)
+	return result
+
+def lemma_text(tokens_list):
+	from nltk.stem import WordNetLemmatizer
+	lemmatizer = WordNetLemmatizer()
+	result = []
+	for token in tokens_list:
+		temp = lemmatizer.lemmatize(token)
+		result.append(temp)
+	return result
 
 
 

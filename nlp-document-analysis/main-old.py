@@ -1,22 +1,17 @@
-from os import listdir
-from os.path import isfile, join
-import os
-import glob
-import textract
-from tqdm import tqdm
-import docx2txt
-import tika
-from tika import parser
-import pandas as pd
+## Import Libraries
 import textExtraction as te
 import importUtils
 from tqdm import tqdm
+import pandas as pd
 from os import listdir
 from os.path import isfile, join
 import plotUtils as plotu
 import mlUtils as ml
-import numpy as np
+import numpy
 
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', 200)
 
 MAX_READ_RESUME = -1
 NUM_TOP_USED_WORD = 100
@@ -27,52 +22,14 @@ K_CLUS = 2
 if __name__ == '__main__':
 
 	print("----Load Resume----")
-	resume_name_list = importUtils.getListOfFiles("greenhouse-resumes")
+	resume_name_list = importUtils.getListOfFiles("Original_Resumes")
+	valid_file_list, resume_string_extract = importUtils.read_files_tika(resume_name_list, max_read = MAX_READ_RESUME)
 
-	data_rejected = pd.read_csv("candidates_rejected.csv")
-	data_hired = pd.read_csv("candidates_hired.csv")
+	dataset = pd.DataFrame(columns=['file_name','raw_text','emails','phone_numbers','names','gpas','tokens_nltk', 'tokens_keras', 'tokens_id_encoded'])
+	# dataset['file_name'] = resume_name_list
+	if MAX_READ_RESUME > 0:
+		dataset = dataset[0:MAX_READ_RESUME]
 
-	dataset = pd.concat([data_hired, data_rejected])
-
-	FILE_NAME_PREFIX = "greenhouse-resumes\\"
-
-	dataset['filename'] = FILE_NAME_PREFIX + dataset['First Name'] + " " + dataset['Last Name'] + ".pdf"
-	dataset['filename'] = dataset['filename'].str.replace('"','')
-
-	got_filename_from_sheet = list(dataset['filename'])
-
-	count_found = 0
-
-	found_resume = list()
-
-	for resume_name in resume_name_list:
-		if resume_name in got_filename_from_sheet:
-			count_found = count_found + 1
-			found_resume.append(resume_name)
-		else:
-			print("Can't find : ", resume_name)
-
-	print("Resume Found : ", count_found)
-
-	dataset = dataset[dataset.filename.isin(found_resume)]
-	dataset['Application Date'] = pd.to_datetime(dataset['Application Date'])
-	dataset = dataset.sort_values('Application Date').drop_duplicates(['filename'] ,keep='last')
-	dataset.reset_index(drop=True, inplace=True)
-
-	valid_file_list, resume_string_extract = importUtils.read_files_tika(dataset['filename'], max_read = MAX_READ_RESUME)
-
-	dataset["tokens_nltk"] = np.nan
-	dataset["tokens_nltk"] = dataset["tokens_nltk"].astype('object')
-	dataset["emails"] = np.nan
-	dataset["emails"] = dataset["emails"].astype('object')
-	dataset["names"] = np.nan
-	dataset["names"] = dataset["emails"].astype('object')
-	dataset["phone_numbers"] = np.nan
-	dataset["phone_numbers"] = dataset["phone_numbers"].astype('object')
-	dataset["gpas"] = np.nan
-	dataset["gpas"] = dataset["gpas"].astype('object')
-
-	# dataset['text'] = resume_string_extract
 	print("\n----Clean text and Extract A lot of stuff----")
 	count_text = 0
 	for resume_text in tqdm(resume_string_extract, desc="Clean and extract text"):
@@ -88,8 +45,6 @@ if __name__ == '__main__':
 		words = te.remove_stopwords(words)
 		words = te.remove_single_character(words)
 		words = te.remove_months_abbrev(words)
-		words = te.stemming_text(words)
-		# words = te.lemma_text(words)
 
 		##Extract Email
 		# print(count_text, "-Extract Email")
@@ -109,32 +64,32 @@ if __name__ == '__main__':
 
 		##Insert to DataFrame
 		# print(count_text, "-Add data to dataframe")
-		# print(valid_file_list[count_text])
 		dataset.loc[count_text,'file_name'] = valid_file_list[count_text]
 		# print("")
-		# print(resume_text)
 		dataset.loc[count_text,'raw_text'] = resume_text
 		# print("-")
-		# print(words)
-		dataset.at[count_text,'tokens_nltk'] = words
+		dataset.loc[count_text,'tokens_nltk'] = words
 		# print("--")
-		dataset.at[count_text,'emails'] = emails
+		dataset.loc[count_text,'emails'] = emails
 		# print("---")
-		dataset.at[count_text,'phone_numbers'] = numbers
+		dataset.loc[count_text,'phone_numbers'] = numbers
 		# print("----")
-		dataset.at[count_text,'names'] = names
+		dataset.loc[count_text,'names'] = names
 		# print("-----")
-		dataset.at[count_text,'gpas'] = gpas
+		dataset.loc[count_text,'gpas'] = gpas
 		# print("------")
+
 		count_text = count_text + 1
 
-	print(dataset)
+	dataset = dataset.dropna(subset=['raw_text'])
+	## Encode text with keras
+	# dataset['tokens_keras'] = te.extract_token_keras(dataset['raw_text'], NUM_TOP_USED_WORD)
 
 	## Merge All documents tokens to one long list
 	all_resumes_nltk_tokens = te.merge_all_documents_token_to_one(dataset['tokens_nltk'])
+
 	## Visualized most used N words
 	dict_word_top_used = te.get_words_df_by_top_used(all_resumes_nltk_tokens, NUM_TOP_USED_WORD)
-	plotu.plot_word_cloud(' '.join(all_resumes_nltk_tokens), "word_cloud_top_"+str(NUM_TOP_USED_WORD))
 	plotu.plot_bar(dict_word_top_used['word'], dict_word_top_used['frequency'],
 	 'Word', 'Frequency','top_'+str(NUM_TOP_USED_WORD)+'_word')
 
@@ -142,13 +97,9 @@ if __name__ == '__main__':
 	## Get the word dictionary with all words that appear more than 5 times
 	dict_word_used_at_least_min = te.get_words_df_by_at_least_min_count(all_resumes_nltk_tokens, MIN_COUNT)
 	
-	dataset["tokens_id_encoded"] = np.nan
-	dataset["tokens_id_encoded"] = dataset["tokens_id_encoded"].astype('object')
-
 	## Encode words with it's ID from previous word dictionary
 	for i in tqdm(range(len(dataset)), desc="Encode word wtih dict"):
-		temp = te.encode_word_with_dict(dataset.loc[i, 'tokens_nltk'], dict_word_used_at_least_min)
-		dataset.at[i, 'tokens_id_encoded'] = temp
+		dataset.loc[i, 'tokens_id_encoded'] = te.encode_word_with_dict(dataset.loc[i, 'tokens_nltk'], dict_word_used_at_least_min)
 	# print(dataset['tokens_id_encoded'])
 	
 	## Find the average number of words in the document
@@ -175,3 +126,5 @@ if __name__ == '__main__':
 	dataset.to_csv('dataset.csv', index=False)
 
 	exit()
+
+
