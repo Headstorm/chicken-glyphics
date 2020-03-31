@@ -9,6 +9,7 @@ from keras.preprocessing.text import Tokenizer
 import pickle
 from tqdm import tqdm
 from nltk.stem import WordNetLemmatizer
+import re
 
 nltk.download('stopwords')
 nltk.download('averaged_perceptron_tagger')
@@ -24,6 +25,16 @@ def merge_all_documents_token_to_one(documents):
 	for document in documents:
 		all_resumes_nltk_tokens = all_resumes_nltk_tokens + document
 	return all_resumes_nltk_tokens
+
+def merge_all_ngram_to_one(documents):
+	all_trigram_tokens = []
+	for document in documents:
+		all_trigram_tokens = all_trigram_tokens + document
+	return all_trigram_tokens
+
+def get_n_gram_frequency_most_common(ngram_list, n_word):
+	fdist = nltk.FreqDist(ngram_list).most_common(n_word)
+	return fdist
 
 def get_words_df_by_top_used(documents, num_words):
 	fdist = nltk.FreqDist(documents)
@@ -52,6 +63,18 @@ def get_words_df_by_at_least_min_count(documents, min_count):
 	result.to_csv('word_dic_with_min_freq_'+str(min_count)+'.csv', index=True)
 	return result
 
+def remove_url(document):
+	text = re.sub(r'^https?:\/\/.*[\r\n]*', '', document, flags=re.MULTILINE)
+	return text
+
+def remove_digits(document):
+	result = ''.join([i for i in document if not i.isdigit()])
+	return result
+
+def remove_email(document):
+	result = ' '.join([i for i in document.split() if '@' not in i])
+	return result
+
 def remove_months_abbrev(document):
 	result = []
 	month_list = ('jan','feb','mar','apr','may',
@@ -62,7 +85,8 @@ def remove_months_abbrev(document):
 	return result
 
 def remove_word_with_nonalpha(document):
-	result = [word for word in document if word.isalpha()]
+	words = set(nltk.corpus.words.words())
+	result = [w for w in document if w.lower() in words or not w.isalpha()]
 	return result
 
 def remove_stopwords(document):
@@ -241,6 +265,10 @@ def lemma_text(tokens_list):
 		result.append(temp)
 	return result
 
+def n_gram(n, tokens_list):
+	from nltk.util import ngrams
+	ngrams = list(ngrams(tokens_list, n))
+	return ngrams
 
 
 

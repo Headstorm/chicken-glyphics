@@ -23,6 +23,8 @@ NUM_TOP_USED_WORD = 100
 MIN_COUNT = 5
 PCA_COMP = 8
 K_CLUS = 2
+NGRAM = 3
+NUM_TOP_USED_NGRAM = 50
 
 if __name__ == '__main__':
 
@@ -71,6 +73,8 @@ if __name__ == '__main__':
 	dataset["phone_numbers"] = dataset["phone_numbers"].astype('object')
 	dataset["gpas"] = np.nan
 	dataset["gpas"] = dataset["gpas"].astype('object')
+	dataset["ngram"] = np.nan
+	dataset["ngram"] = dataset["ngram"].astype('object')
 
 	# dataset['text'] = resume_string_extract
 	print("\n----Clean text and Extract A lot of stuff----")
@@ -90,6 +94,7 @@ if __name__ == '__main__':
 		words = te.remove_months_abbrev(words)
 		words = te.stemming_text(words)
 		# words = te.lemma_text(words)
+		# print(words)
 
 		##Extract Email
 		# print(count_text, "-Extract Email")
@@ -106,6 +111,17 @@ if __name__ == '__main__':
 		##Extract GPA
 		# print(count_text, "-Extract GPAS")
 		gpas = te.extract_gpas(resume_text)
+
+		##Extract NGram
+		temp_text = te.remove_url(resume_text)
+		temp_text = te.remove_digits(temp_text)
+		temp_text = te.remove_email(temp_text)
+		tokens = te.extract_casual_to_tokens(temp_text)
+		words = te.remove_stopwords(words)
+		words = te.remove_word_with_nonalpha(tokens)
+		words = te.remove_single_character(words)
+		words = te.remove_months_abbrev(words)
+		ngram = te.n_gram(NGRAM, words)
 
 		##Insert to DataFrame
 		# print(count_text, "-Add data to dataframe")
@@ -126,9 +142,16 @@ if __name__ == '__main__':
 		# print("-----")
 		dataset.at[count_text,'gpas'] = gpas
 		# print("------")
+		dataset.at[count_text,'ngram'] = ngram
+
 		count_text = count_text + 1
 
-	print(dataset)
+	count_status_df = dataset['Status'].value_counts().rename_axis('status').reset_index(name='counts')
+	print(count_status_df)
+
+	## Visualization
+
+	## Visualization of TOP-N Words
 
 	## Merge All documents tokens to one long list
 	all_resumes_nltk_tokens = te.merge_all_documents_token_to_one(dataset['tokens_nltk'])
@@ -137,6 +160,69 @@ if __name__ == '__main__':
 	plotu.plot_word_cloud(' '.join(all_resumes_nltk_tokens), "word_cloud_top_"+str(NUM_TOP_USED_WORD))
 	plotu.plot_bar(dict_word_top_used['word'], dict_word_top_used['frequency'],
 	 'Word', 'Frequency','top_'+str(NUM_TOP_USED_WORD)+'_word')
+
+	## Visualization of TOP-N Words by Status
+
+	### Hired
+
+	Status = "Hired"
+
+	## Merge All documents tokens to one long list
+	all_resumes_nltk_tokens = te.merge_all_documents_token_to_one(dataset.loc[dataset['Status'] == Status, 'tokens_nltk'])
+	## Visualized most used N words
+	dict_word_top_used = te.get_words_df_by_top_used(all_resumes_nltk_tokens, NUM_TOP_USED_WORD)
+	plotu.plot_word_cloud(' '.join(all_resumes_nltk_tokens), "word_cloud_top_"+str(NUM_TOP_USED_WORD)+"_"+Status)
+	plotu.plot_bar(dict_word_top_used['word'], dict_word_top_used['frequency'],
+	 'Word', 'Frequency','top_'+str(NUM_TOP_USED_WORD)+'_word_'+Status)
+
+	### Rejected
+
+	Status = "Rejected"
+
+	## Merge All documents tokens to one long list
+	all_resumes_nltk_tokens = te.merge_all_documents_token_to_one(dataset.loc[dataset['Status'] == Status, 'tokens_nltk'])
+	## Visualized most used N words
+	dict_word_top_used = te.get_words_df_by_top_used(all_resumes_nltk_tokens, NUM_TOP_USED_WORD)
+	plotu.plot_word_cloud(' '.join(all_resumes_nltk_tokens), "word_cloud_top_"+str(NUM_TOP_USED_WORD)+"_"+Status)
+	plotu.plot_bar(dict_word_top_used['word'], dict_word_top_used['frequency'],
+	 'Word', 'Frequency','top_'+str(NUM_TOP_USED_WORD)+'_word_'+Status)
+
+	## Visualization of TOP-N NGram
+
+	all_ngram_tokens = te.merge_all_ngram_to_one(dataset['ngram'])
+	## Visualized most used N words
+	fdist = te.get_n_gram_frequency_most_common(all_ngram_tokens, NUM_TOP_USED_NGRAM)
+	df_fdist = pd.DataFrame(fdist, columns =['ngram', 'frequency'])
+	df_fdist["ngram"] = df_fdist["ngram"].astype('str')
+	plotu.plot_bar(df_fdist['ngram'], df_fdist['frequency'],
+	 'NGram', 'Frequency','top_'+str(NUM_TOP_USED_NGRAM)+'_ngram')
+
+	## Visualization of TOP-N NGram by Status
+
+	### Hired
+
+	Status = "Hired"
+
+	all_ngram_tokens = te.merge_all_ngram_to_one(dataset.loc[dataset['Status'] == Status, 'ngram'])
+	## Visualized most used N words
+	fdist = te.get_n_gram_frequency_most_common(all_ngram_tokens, NUM_TOP_USED_NGRAM)
+	df_fdist = pd.DataFrame(fdist, columns =['ngram', 'frequency'])
+	df_fdist["ngram"] = df_fdist["ngram"].astype('str')
+	plotu.plot_bar(df_fdist['ngram'], df_fdist['frequency'],
+	 'NGram', 'Frequency','top_'+str(NUM_TOP_USED_NGRAM)+'_ngram_'+Status)
+
+	### Rejected
+
+	Status = "Rejected"
+
+	all_ngram_tokens = te.merge_all_ngram_to_one(dataset.loc[dataset['Status'] == Status, 'ngram'])
+	## Visualized most used N words
+	fdist = te.get_n_gram_frequency_most_common(all_ngram_tokens, NUM_TOP_USED_NGRAM)
+	df_fdist = pd.DataFrame(fdist, columns =['ngram', 'frequency'])
+	df_fdist["ngram"] = df_fdist["ngram"].astype('str')
+	plotu.plot_bar(df_fdist['ngram'], df_fdist['frequency'],
+	 'NGram', 'Frequency','top_'+str(NUM_TOP_USED_NGRAM)+'_ngram_'+Status)
+
 
 	#### Word Encoding
 	## Get the word dictionary with all words that appear more than 5 times

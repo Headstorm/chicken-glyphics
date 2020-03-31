@@ -25,7 +25,6 @@ def plot_word_cloud(text, filename):
 
 	# Display the generated image:
 	# the matplotlib way:
-	import matplotlib.pyplot as plt
 	plt.imshow(wordcloud, interpolation='bilinear')
 	plt.axis("off")
 
